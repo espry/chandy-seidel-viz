@@ -17,12 +17,14 @@ export function exportDistributionCSV(result, countryCode, year) {
         return;
     }
 
-    // Build CSV content
+    // Build CSV content with comprehensive columns
     const headers = [
         'country',
         'year',
+        'quantile',
         'p_survey',
         'l_survey',
+        'welfare_survey',
         'p_adjusted',
         'l_adjusted',
         'is_pareto_tail'
@@ -30,58 +32,45 @@ export function exportDistributionCSV(result, countryCode, year) {
 
     const rows = [];
 
-    // Original distribution points
-    result.originalDist.forEach(d => {
+    // First, add all original survey distribution points
+    result.originalDist.forEach((d, idx) => {
+        // Find corresponding adjusted point (rescaled original)
+        const adjPoint = result.adjustedDist.find(a =>
+            !a.isPareto && a.originalP !== undefined && Math.abs(a.originalP - d.p) < 0.0001
+        );
+
         rows.push([
             countryCode,
             year,
+            idx + 1,
             d.p.toFixed(6),
             d.l.toFixed(6),
-            '', // p_adjusted filled below
-            '', // l_adjusted filled below
+            d.w !== undefined ? d.w.toFixed(2) : '',
+            adjPoint ? adjPoint.p.toFixed(6) : '',
+            adjPoint ? adjPoint.l.toFixed(6) : '',
             0
         ]);
     });
 
-    // Match with adjusted distribution
-    result.adjustedDist.forEach(adj => {
-        // Find if this is a Pareto point or rescaled original
-        if (adj.isPareto) {
-            rows.push([
-                countryCode,
-                year,
-                '', // No survey equivalent
-                '',
-                adj.p.toFixed(6),
-                adj.l.toFixed(6),
-                1
-            ]);
-        }
-    });
-
-    // Create CSV with merged data
-    const mergedRows = [];
-
-    // Process original and adjusted together
-    const origIdx = new Map();
-    result.originalDist.forEach((d, i) => origIdx.set(i, d));
-
-    result.adjustedDist.forEach(adj => {
-        const row = [
+    // Then add Pareto tail points (new observations)
+    const paretoPoints = result.adjustedDist.filter(d => d.isPareto);
+    paretoPoints.forEach((d, idx) => {
+        rows.push([
             countryCode,
             year,
-            adj.originalP !== undefined ? adj.originalP.toFixed(6) : '',
-            adj.originalL !== undefined ? adj.originalL.toFixed(6) : '',
-            adj.p.toFixed(6),
-            adj.l.toFixed(6),
-            adj.isPareto ? 1 : 0
-        ];
-        mergedRows.push(row);
+            result.originalDist.length + idx + 1,
+            '', // No survey p
+            '', // No survey l
+            '', // No survey welfare
+            d.p.toFixed(6),
+            d.l.toFixed(6),
+            1
+        ]);
     });
 
     // Create CSV string
     let csv = headers.join(',') + '\n';
-    mergedRows.forEach(row => {
+    rows.forEach(row => {
         csv += row.join(',') + '\n';
     });
 
