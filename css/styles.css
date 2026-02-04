@@ -1,0 +1,478 @@
+/**
+ * styles.css - Fullscreen layout for Chandy-Seidel visualization
+ */
+
+/* Root variables */
+:root {
+    --color-primary: #2563eb;
+    --color-secondary: #dc2626;
+    --color-accent: #0d9488;
+    --color-text: #1e293b;
+    --color-text-muted: #64748b;
+    --color-bg: #f1f5f9;
+    --color-card: #ffffff;
+    --color-border: #e2e8f0;
+    --color-success: #10b981;
+    --color-warning: #f59e0b;
+    --color-error: #ef4444;
+}
+
+/* ============================================
+   FULLSCREEN LAYOUT
+   ============================================ */
+
+html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+}
+
+body.fullscreen-layout {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Compact Header */
+.app-header-compact {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+    color: white;
+    padding: 0.5rem 0;
+    flex-shrink: 0;
+}
+
+.app-header-compact h1 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+/* Main content fills remaining space */
+.main-fullscreen {
+    flex: 1;
+    overflow: hidden;
+    padding: 0.75rem 0;
+}
+
+.main-fullscreen .row {
+    height: 100%;
+}
+
+/* ============================================
+   CONTROL CARDS (Left & Right panels)
+   ============================================ */
+
+.control-card {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 0.75rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.control-label-sm {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+    display: block;
+}
+
+/* Compact stats */
+.stats-compact {
+    font-size: 0.8rem;
+}
+
+.stat-row-sm {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.2rem 0;
+}
+
+.stat-row-sm span:first-child {
+    color: var(--color-text-muted);
+}
+
+.stat-row-sm span:last-child {
+    font-weight: 600;
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.75rem;
+}
+
+/* ============================================
+   CHART AREA (Center)
+   ============================================ */
+
+.chart-card {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+.chart-container-full {
+    width: 100%;
+    height: 100%;
+}
+
+#lorenz-chart {
+    width: 100%;
+    height: 100%;
+}
+
+/* Legend bar */
+.legend-bar {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+}
+
+.legend-line-sm {
+    display: inline-block;
+    width: 16px;
+    height: 2px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+.legend-line-sm.survey {
+    background: var(--color-primary);
+}
+
+.legend-line-sm.adjusted {
+    background: var(--color-secondary);
+}
+
+.legend-line-sm.equality {
+    background: repeating-linear-gradient(90deg, #9ca3af, #9ca3af 3px, transparent 3px, transparent 6px);
+}
+
+.legend-dot-sm {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-secondary);
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+/* ============================================
+   GINI DISPLAY (Right panel - prominent)
+   ============================================ */
+
+.gini-card {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+    border-radius: 10px;
+    padding: 1rem;
+    color: white;
+    text-align: center;
+}
+
+.gini-header {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    opacity: 0.8;
+    margin-bottom: 0.5rem;
+}
+
+.gini-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+}
+
+.gini-item {
+    text-align: center;
+}
+
+.gini-item .gini-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    opacity: 0.7;
+    margin-bottom: 0.15rem;
+}
+
+.gini-value-lg {
+    font-size: 1.75rem;
+    font-weight: 700;
+    font-family: 'SF Mono', Monaco, monospace;
+    line-height: 1;
+}
+
+.gini-value-lg.survey {
+    color: #93c5fd;
+}
+
+.gini-value-lg.adjusted {
+    color: #fca5a5;
+}
+
+.gini-arrow-lg {
+    font-size: 1.25rem;
+    opacity: 0.6;
+}
+
+.gini-change-display {
+    margin-top: 0.5rem;
+}
+
+.gini-change-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.gini-change-badge.increase {
+    background: rgba(254, 202, 202, 0.3);
+    color: #fecaca;
+}
+
+.gini-change-badge.decrease {
+    background: rgba(167, 243, 208, 0.3);
+    color: #a7f3d0;
+}
+
+/* ============================================
+   RESULTS CARDS (Mean, Top 10%)
+   ============================================ */
+
+.results-card {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 0.6rem;
+    text-align: center;
+}
+
+.results-header {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+    margin-bottom: 0.4rem;
+}
+
+.results-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.results-item {
+    text-align: center;
+}
+
+.results-label {
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    margin-bottom: 0.1rem;
+}
+
+.results-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    font-family: 'SF Mono', Monaco, monospace;
+    line-height: 1;
+}
+
+.results-value.survey {
+    color: var(--color-primary);
+}
+
+.results-value.adjusted {
+    color: var(--color-secondary);
+}
+
+.results-arrow {
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+    opacity: 0.5;
+}
+
+.results-change-display {
+    margin-top: 0.3rem;
+}
+
+.results-change-badge {
+    display: inline-block;
+    padding: 0.15rem 0.4rem;
+    border-radius: 8px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    background: var(--color-bg);
+    color: var(--color-text-muted);
+}
+
+.results-change-badge.increase {
+    background: rgba(220, 38, 38, 0.1);
+    color: var(--color-secondary);
+}
+
+.results-change-badge.decrease {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--color-success);
+}
+
+/* ============================================
+   FORM ELEMENTS
+   ============================================ */
+
+.form-select-sm, .form-control-sm {
+    font-size: 0.85rem;
+    padding: 0.35rem 0.5rem;
+}
+
+.form-range {
+    height: 1rem;
+}
+
+.btn-check:checked + .btn-outline-secondary {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+}
+
+/* Year selection buttons */
+#year-buttons {
+    max-height: 70px;
+    overflow-y: auto;
+}
+
+#year-buttons .btn {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    min-width: 3rem;
+}
+
+.btn-check:checked + .btn-outline-primary {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+}
+
+/* ============================================
+   LOADING & STATES
+   ============================================ */
+
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--color-border);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.no-data-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+}
+
+/* ============================================
+   TOOLTIP
+   ============================================ */
+
+.lorenz-tooltip {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 991px) {
+    body.fullscreen-layout {
+        overflow: auto;
+    }
+
+    .main-fullscreen {
+        overflow: visible;
+        padding: 1rem 0;
+    }
+
+    .main-fullscreen .row {
+        height: auto;
+    }
+
+    .chart-card {
+        height: 400px;
+        margin-bottom: 1rem;
+    }
+
+    .col-md-3, .col-md-6 {
+        margin-bottom: 1rem;
+    }
+}
+
+@media (max-width: 767px) {
+    .app-header-compact h1 {
+        font-size: 1rem;
+    }
+
+    .gini-value-lg {
+        font-size: 1.25rem;
+    }
+
+    .chart-card {
+        height: 300px;
+    }
+}
+
+/* ============================================
+   PRINT
+   ============================================ */
+
+@media print {
+    body.fullscreen-layout {
+        overflow: visible;
+        height: auto;
+    }
+
+    .app-header-compact {
+        background: none;
+        color: black;
+    }
+
+    .btn, button {
+        display: none;
+    }
+}

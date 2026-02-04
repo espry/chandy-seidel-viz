@@ -1,0 +1,38 @@
+{
+  "USA": {
+    "2013": {"survey_mean": 38.50, "hfce": 52.30, "gdp": 68.10},
+    "2016": {"survey_mean": 40.20, "hfce": 55.80, "gdp": 72.50},
+    "2019": {"survey_mean": 42.30, "hfce": 58.40, "gdp": 76.20}
+  },
+  "CHN": {
+    "2013": {"survey_mean": 8.20, "hfce": 10.50, "gdp": 18.90},
+    "2016": {"survey_mean": 10.80, "hfce": 13.20, "gdp": 22.50},
+    "2019": {"survey_mean": 14.50, "hfce": 17.80, "gdp": 28.30}
+  },
+  "IND": {
+    "2011": {"survey_mean": 3.80, "hfce": 4.90, "gdp": 8.20},
+    "2019": {"survey_mean": 5.20, "hfce": 6.80, "gdp": 11.50}
+  },
+  "BRA": {
+    "2014": {"survey_mean": 15.20, "hfce": 19.80, "gdp": 26.40},
+    "2017": {"survey_mean": 14.80, "hfce": 18.90, "gdp": 24.80},
+    "2019": {"survey_mean": 15.50, "hfce": 19.20, "gdp": 25.10}
+  },
+  "DEU": {
+    "2015": {"survey_mean": 45.80, "hfce": 52.10, "gdp": 78.50},
+    "2018": {"survey_mean": 48.20, "hfce": 55.40, "gdp": 82.30}
+  },
+  "NGA": {
+    "2010": {"survey_mean": 2.80, "hfce": 3.90, "gdp": 6.80},
+    "2018": {"survey_mean": 2.50, "hfce": 3.20, "gdp": 5.90}
+  },
+  "ZAF": {
+    "2014": {"survey_mean": 12.80, "hfce": 18.50, "gdp": 28.40},
+    "2017": {"survey_mean": 13.20, "hfce": 19.10, "gdp": 29.80}
+  },
+  "MEX": {
+    "2014": {"survey_mean": 12.50, "hfce": 16.80, "gdp": 25.20},
+    "2018": {"survey_mean": 13.20, "hfce": 17.50, "gdp": 26.80},
+    "2020": {"survey_mean": 12.80, "hfce": 16.20, "gdp": 24.50}
+  }
+}

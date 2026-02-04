@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chandy-Seidel Adjustment</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="css/styles.css" rel="stylesheet">
+</head>
+<body class="fullscreen-layout">
+    <!-- Compact Header -->
+    <header class="app-header-compact">
+        <div class="container-fluid px-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1>Chandy-Seidel Adjustment</h1>
+                <span class="badge bg-light text-dark" id="selection-badge">Select a country</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content - Full Height -->
+    <main class="main-fullscreen">
+        <div class="container-fluid h-100 px-4">
+            <div class="row h-100 g-3">
+                <!-- Left: Controls -->
+                <div class="col-md-3 d-flex flex-column">
+                    <!-- Selection -->
+                    <div class="control-card mb-2">
+                        <div class="mb-2">
+                            <label class="control-label-sm" for="country-select">Country</label>
+                            <select id="country-select" class="form-select form-select-sm">
+                                <option value="">Select country...</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="control-label-sm">Year</label>
+                            <div id="year-buttons" class="d-flex flex-wrap gap-1">
+                                <!-- Year radio buttons populated dynamically -->
+                            </div>
+                        </div>
+                        <button class="btn btn-primary btn-sm w-100" id="load-btn" disabled>
+                            Load Distribution
+                        </button>
+                    </div>
+
+                    <!-- Gap Share Control -->
+                    <div class="control-card mb-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="control-label-sm mb-0">Gap Share</label>
+                            <span class="badge bg-primary" id="gap-share-display">50%</span>
+                        </div>
+                        <input type="range" class="form-range" id="gap-share-slider"
+                               min="0" max="100" value="50" step="5">
+                        <div class="d-flex justify-content-between">
+                            <small class="text-muted">0%</small>
+                            <small class="text-muted">100%</small>
+                        </div>
+                    </div>
+
+                    <!-- NAS Source -->
+                    <div class="control-card mb-2">
+                        <label class="control-label-sm">NAS Source</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="nas-source" id="nas-hfce-radio" value="hfce" checked>
+                            <label class="btn btn-outline-secondary btn-sm" for="nas-hfce-radio">HFCE</label>
+                            <input type="radio" class="btn-check" name="nas-source" id="nas-gdp-radio" value="gdp">
+                            <label class="btn btn-outline-secondary btn-sm" for="nas-gdp-radio">GDP</label>
+                        </div>
+                    </div>
+
+                    <!-- Data Stats -->
+                    <div class="control-card mb-2 flex-grow-1">
+                        <label class="control-label-sm">Data</label>
+                        <div class="stats-compact">
+                            <div class="stat-row-sm">
+                                <span>Survey Mean</span>
+                                <span id="survey-mean">--</span>
+                            </div>
+                            <div class="stat-row-sm">
+                                <span>NAS Mean</span>
+                                <span id="nas-hfce">--</span>
+                            </div>
+                            <div class="stat-row-sm">
+                                <span>Gap</span>
+                                <span id="nas-gap">--</span>
+                            </div>
+                            <hr class="my-1">
+                            <div class="stat-row-sm">
+                                <span>Alpha</span>
+                                <span id="pareto-alpha">--</span>
+                            </div>
+                            <div class="stat-row-sm">
+                                <span>Coverage</span>
+                                <span id="survey-coverage">--</span>
+                            </div>
+                            <div class="stat-row-sm">
+                                <span>Pareto Bins</span>
+                                <span id="pareto-bins">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Export -->
+                    <div class="control-card">
+                        <div class="d-grid gap-1">
+                            <button class="btn btn-outline-secondary btn-sm" id="export-dist-btn" disabled>
+                                Export CSV
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Center: Chart -->
+                <div class="col-md-6 d-flex flex-column">
+                    <div class="chart-card flex-grow-1">
+                        <div class="chart-container-full position-relative h-100">
+                            <div id="lorenz-chart"></div>
+                            <div class="loading-overlay" id="loading-overlay" style="display: none;">
+                                <div class="spinner"></div>
+                            </div>
+                            <div class="no-data-message" id="no-data-message">
+                                <p>Select a country and click "Load Distribution"</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Legend -->
+                    <div class="legend-bar mt-2">
+                        <span><span class="legend-line-sm survey"></span> Survey</span>
+                        <span><span class="legend-line-sm adjusted"></span> Adjusted</span>
+                        <span><span class="legend-dot-sm"></span> Pareto</span>
+                        <span><span class="legend-line-sm equality"></span> Equality</span>
+                    </div>
+                </div>
+
+                <!-- Right: Results -->
+                <div class="col-md-3 d-flex flex-column">
+                    <!-- Gini Display - Prominent -->
+                    <div class="gini-card mb-2">
+                        <div class="gini-header">Gini Coefficient</div>
+                        <div class="gini-display">
+                            <div class="gini-item">
+                                <div class="gini-label">Survey</div>
+                                <div class="gini-value-lg survey" id="gini-survey">--</div>
+                            </div>
+                            <div class="gini-arrow-lg">&rarr;</div>
+                            <div class="gini-item">
+                                <div class="gini-label">Adjusted</div>
+                                <div class="gini-value-lg adjusted" id="gini-adjusted">--</div>
+                            </div>
+                        </div>
+                        <div class="gini-change-display">
+                            <span class="gini-change-badge" id="gini-change">--</span>
+                        </div>
+                    </div>
+
+                    <!-- Mean Display -->
+                    <div class="results-card mb-2">
+                        <div class="results-header">Mean Income ($/day)</div>
+                        <div class="results-display">
+                            <div class="results-item">
+                                <div class="results-label">Survey</div>
+                                <div class="results-value survey" id="mean-survey">--</div>
+                            </div>
+                            <div class="results-arrow">&rarr;</div>
+                            <div class="results-item">
+                                <div class="results-label">Adjusted</div>
+                                <div class="results-value adjusted" id="mean-adjusted">--</div>
+                            </div>
+                        </div>
+                        <div class="results-change-display">
+                            <span class="results-change-badge" id="mean-change">--</span>
+                        </div>
+                    </div>
+
+                    <!-- Top Decile Share Display -->
+                    <div class="results-card mb-2">
+                        <div class="results-header">Top 10% Income Share</div>
+                        <div class="results-display">
+                            <div class="results-item">
+                                <div class="results-label">Survey</div>
+                                <div class="results-value survey" id="top10-survey">--</div>
+                            </div>
+                            <div class="results-arrow">&rarr;</div>
+                            <div class="results-item">
+                                <div class="results-label">Adjusted</div>
+                                <div class="results-value adjusted" id="top10-adjusted">--</div>
+                            </div>
+                        </div>
+                        <div class="results-change-display">
+                            <span class="results-change-badge" id="top10-change">--</span>
+                        </div>
+                    </div>
+
+                    <!-- Status Message -->
+                    <div class="alert alert-info small mb-0 py-1 px-2" id="status-message" style="display: none;">
+                        <span id="status-text"></span>
+                    </div>
+
+                    <!-- Hidden elements for compatibility -->
+                    <span id="nas-gdp" style="display:none;">--</span>
+                    <button id="export-summary-btn" style="display:none;" disabled></button>
+                    <button id="export-lorenz-btn" style="display:none;" disabled></button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <!-- Application Scripts -->
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
