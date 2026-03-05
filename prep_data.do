@@ -2,28 +2,27 @@
 * prep_data.do - Prepare data for Chandy-Seidel web visualization
 *
 * PURPOSE:
-*   Export welfare_adjusted.dta and dist_gaps.dta to JSON format for the
+*   Export welfare_adjusted.dta and dist_gaps.dta to JSON/CSV format for the
 *   interactive web visualization tool.
 *
 * OUTPUT:
-*   - data/countries.json        : Country metadata
-*   - data/nas_data.json         : NAS means (HFCE, GDP) by country-year
-*   - data/distributions/*.json  : Per-country distribution files
+*   - data/countries.json             : Country metadata
+*   - data/nas_data.json              : NAS means (HFCE, GDP) by country-year
+*   - data/_temp_distributions.csv    : Distribution data (CSV for Python)
+*   - data/dist/*.json                : Per-country columnar JSON (via Python)
+*   - data/dist-by-year/*.json        : Per-year columnar JSON (via Python)
 *
 * USAGE:
 *   1. Run main analysis pipeline first (to create welfare_adjusted.dta)
 *   2. Run this script: do webviz/prep_data.do
+*   3. Run: python3 webviz/csv_to_json.py
 *
 *******************************************************************************/
-
-// ============================================================================
-// SETUP
-// ============================================================================
 
 clear all
 set more off
 
-// Auto-detect paths
+* Auto-detect paths
 local os = c(os)
 if "`os'" == "MacOSX" | "`os'" == "Unix" {
     global project "/Users/espen/Library/CloudStorage/OneDrive-Personal/Research/NApov/2026"
@@ -35,34 +34,35 @@ else {
 global webviz "$project/webviz"
 global temp   "$project/data/temp"
 
-// Create output directories
+* Create output directories
 cap mkdir "$webviz/data"
-cap mkdir "$webviz/data/distributions"
+cap mkdir "$webviz/data/dist"
+cap mkdir "$webviz/data/dist-by-year"
 
 di _n "{hline 70}"
 di "{bf:Preparing Data for Web Visualization}"
 di "{hline 70}" _n
 
-// ============================================================================
-// 1. CREATE COUNTRIES.JSON - Country metadata
-// ============================================================================
+* ============================================================================
+* 1. CREATE COUNTRIES.JSON - Country metadata
+* ============================================================================
 
-di "{bf:Creating countries.json...}"
+di "{bf:Step 1: Creating countries.json...}"
 
 use "$temp/welfare_adjusted.dta", clear
 
-// Get unique countries and their available years
+* Get unique countries and their available years
 collapse (first) region_code, by(country_code year)
 
-// Get list of years per country
+* Get list of years per country
 bysort country_code (year): gen year_list = string(year) if _n == 1
 bysort country_code (year): replace year_list = year_list[_n-1] + "," + string(year) if _n > 1
 bysort country_code: egen years_str = max(year_list)
 
-// Collapse to one row per country
+* Collapse to one row per country
 collapse (first) region_code years_str, by(country_code)
 
-// Add country names (basic mapping for major countries)
+* Add country names (basic mapping for major countries)
 gen country_name = ""
 replace country_name = "United States" if country_code == "USA"
 replace country_name = "China" if country_code == "CHN"
@@ -94,10 +94,10 @@ replace country_name = "Bangladesh" if country_code == "BGD"
 replace country_name = "Pakistan" if country_code == "PAK"
 replace country_name = "Kenya" if country_code == "KEN"
 replace country_name = "Ethiopia" if country_code == "ETH"
-// Default: use country code as name
+* Default: use country code as name
 replace country_name = country_code if country_name == ""
 
-// Write JSON
+* Write JSON
 local n = _N
 file open jsonfile using "$webviz/data/countries.json", write replace
 file write jsonfile "["
@@ -120,164 +120,121 @@ file close jsonfile
 di "  Created: $webviz/data/countries.json"
 di "  Countries: `n'"
 
-// ============================================================================
-// 2. CREATE NAS_DATA.JSON - National accounts data by country-year
-// ============================================================================
+* ============================================================================
+* 2. CREATE NAS_DATA.JSON - National accounts data by country-year
+* ============================================================================
 
-di _n "{bf:Creating nas_data.json...}"
+di _n "{bf:Step 2: Creating nas_data.json...}"
 
 use "$temp/dist_gaps.dta", clear
 
-// Keep relevant variables
+* Keep relevant variables
 keep country_code year dist_mean hfce_pc_ppp_daily gdp_pc_ppp_daily
 
-// Drop missing
+* Drop missing
 drop if missing(hfce_pc_ppp_daily) & missing(gdp_pc_ppp_daily)
 
-// Sort
+* Sort
 sort country_code year
+local n_total = _N
 
-// Get unique countries
-levelsof country_code, local(countries)
-local n_countries : word count `countries'
-
-// Write JSON
+* Write JSON iterating through all rows (no preserve needed)
 file open jsonfile using "$webviz/data/nas_data.json", write replace
 file write jsonfile "{"
 
+local prev_cc = ""
 local first_country = 1
-foreach cc of local countries {
-    preserve
-    keep if country_code == "`cc'"
-    local n_years = _N
 
-    if `first_country' == 0 {
+forval i = 1/`n_total' {
+    local cc = country_code[`i']
+    local yr = year[`i']
+    local sm = dist_mean[`i']
+    local hf = hfce_pc_ppp_daily[`i']
+    local gd = gdp_pc_ppp_daily[`i']
+
+    * Handle missing values
+    if missing(`sm') local sm_str = "null"
+    else {
+        local sm_str : di %9.4f `sm'
+        local sm_str = strtrim("`sm_str'")
+    }
+    if missing(`hf') local hf_str = "null"
+    else {
+        local hf_str : di %9.4f `hf'
+        local hf_str = strtrim("`hf_str'")
+    }
+    if missing(`gd') local gd_str = "null"
+    else {
+        local gd_str : di %9.4f `gd'
+        local gd_str = strtrim("`gd_str'")
+    }
+
+    * New country?
+    if "`cc'" != "`prev_cc'" {
+        * Close previous country
+        if "`prev_cc'" != "" {
+            file write jsonfile _n "  },"
+        }
+        file write jsonfile _n `"  "`cc'": {"'
+        local prev_cc = "`cc'"
+        local first_yr = 1
+    }
+    else {
+        local first_yr = 0
+    }
+
+    if `first_yr' == 0 {
         file write jsonfile ","
     }
-    local first_country = 0
+    file write jsonfile _n `"    "`yr'": {"survey_mean": `sm_str', "hfce": `hf_str', "gdp": `gd_str'}"'
+}
 
-    file write jsonfile _n `"  "`cc'": {"'
-
-    forval i = 1/`n_years' {
-        local yr = year[`i']
-        local sm = dist_mean[`i']
-        local hf = hfce_pc_ppp_daily[`i']
-        local gd = gdp_pc_ppp_daily[`i']
-
-        // Handle missing values
-        if missing(`sm') local sm = "null"
-        else local sm : di %9.4f `sm'
-        if missing(`hf') local hf = "null"
-        else local hf : di %9.4f `hf'
-        if missing(`gd') local gd = "null"
-        else local gd : di %9.4f `gd'
-
-        if `i' > 1 {
-            file write jsonfile ", "
-        }
-        file write jsonfile _n `"    "`yr'": {"survey_mean": `sm', "hfce": `hf', "gdp": `gd'}"'
-    }
-
+* Close last country
+if "`prev_cc'" != "" {
     file write jsonfile _n "  }"
-    restore
 }
 
 file write jsonfile _n "}" _n
 file close jsonfile
 
 di "  Created: $webviz/data/nas_data.json"
-di "  Countries: `n_countries'"
+di "  Rows: `n_total'"
 
-// ============================================================================
-// 3. CREATE PER-COUNTRY DISTRIBUTION FILES
-// ============================================================================
+* ============================================================================
+* 3. EXPORT DISTRIBUTION DATA AS CSV (for fast Python JSON conversion)
+* ============================================================================
 
-di _n "{bf:Creating per-country distribution files...}"
+di _n "{bf:Step 3: Exporting distribution data as CSV...}"
 
 use "$temp/welfare_adjusted.dta", clear
 
-// Keep essential variables only
-keep country_code year quantile new p l y_survey pop
+* Keep essential variables only
+keep country_code year quantile new p l y_survey
 
-// Downsample: keep every 10th bin (plus all Pareto tail bins)
-keep if mod(quantile, 10) == 0 | new == 1
+* Sort
+sort country_code year quantile
 
-// Sort
-sort country_code year p
-
-// Get unique countries
+* Count
+local n = _N
 levelsof country_code, local(countries)
 local n_countries : word count `countries'
-local counter = 0
 
-foreach cc of local countries {
-    local counter = `counter' + 1
+* Export to CSV for fast JSON conversion by Python
+export delimited using "$webviz/data/_temp_distributions.csv", replace
 
-    preserve
-    keep if country_code == "`cc'"
+di "  Exported CSV: `n' rows, `n_countries' countries"
 
-    // Get years for this country
-    levelsof year, local(years)
+* ============================================================================
+* 4. RUN PYTHON TO CONVERT CSV -> JSON
+* ============================================================================
 
-    // Write JSON for this country
-    file open jsonfile using "$webviz/data/distributions/`cc'.json", write replace
-    file write jsonfile `"{"code": "`cc'", "years": {"'
+di _n "{bf:Step 4: Converting CSV to per-country JSON files...}"
 
-    local first_year = 1
-    foreach yr of local years {
-        preserve
-        keep if year == `yr'
-        local n_bins = _N
+shell python3 "$webviz/csv_to_json.py"
 
-        if `first_year' == 0 {
-            file write jsonfile ","
-        }
-        local first_year = 0
-
-        file write jsonfile _n `"  "`yr'": {"bins": ["'
-
-        forval i = 1/`n_bins' {
-            local q = quantile[`i']
-            local pp = p[`i']
-            local ll = l[`i']
-            local ww = y_survey[`i']
-            local isnew = new[`i']
-
-            // Handle missing/null
-            if missing(`pp') local pp = "null"
-            else local pp : di %9.6f `pp'
-            if missing(`ll') local ll = "null"
-            else local ll : di %9.6f `ll'
-            if missing(`ww') local ww = "null"
-            else local ww : di %9.4f `ww'
-            if missing(`isnew') local isnew = 0
-
-            if `i' > 1 {
-                file write jsonfile ","
-            }
-            file write jsonfile _n `"    {"q": `q', "p": `pp', "l": `ll', "w": `ww', "new": `isnew'}"'
-        }
-
-        file write jsonfile _n "  ]}"
-        restore
-    }
-
-    file write jsonfile _n "}}" _n
-    file close jsonfile
-
-    // Progress
-    if mod(`counter', 20) == 0 {
-        di "  Processed `counter' / `n_countries' countries..."
-    }
-
-    restore
-}
-
-di "  Created `n_countries' distribution files in $webviz/data/distributions/"
-
-// ============================================================================
-// SUMMARY
-// ============================================================================
+* ============================================================================
+* SUMMARY
+* ============================================================================
 
 di _n "{hline 70}"
 di "{bf:DATA PREPARATION COMPLETE}"
@@ -286,7 +243,8 @@ di ""
 di "Output files:"
 di "  $webviz/data/countries.json"
 di "  $webviz/data/nas_data.json"
-di "  $webviz/data/distributions/*.json (`n_countries' files)"
+di "  $webviz/data/dist/*.json (`n_countries' per-country files)"
+di "  $webviz/data/dist-by-year/*.json (per-year files)"
 di ""
 di "To use the web tool:"
 di "  1. cd $webviz"

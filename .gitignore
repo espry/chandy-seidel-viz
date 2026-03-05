@@ -1,0 +1,5 @@
+data/_temp_distributions.csv
+data/dist-by-year/
+data/distributions/
+*.log
+webviz/

@@ -30,11 +30,12 @@
                 <div class="col-md-3 d-flex flex-column">
                     <!-- Selection -->
                     <div class="control-card mb-2">
-                        <div class="mb-2">
-                            <label class="control-label-sm" for="country-select">Country</label>
-                            <select id="country-select" class="form-select form-select-sm">
-                                <option value="">Select country...</option>
-                            </select>
+                        <div class="mb-2 position-relative">
+                            <label class="control-label-sm" for="country-input">Country</label>
+                            <input type="text" id="country-input" class="form-control form-control-sm"
+                                   placeholder="Type to search..." autocomplete="off">
+                            <div id="country-dropdown" class="country-dropdown" style="display:none;"></div>
+                            <input type="hidden" id="country-select" value="">
                         </div>
                         <div class="mb-2">
                             <label class="control-label-sm">Year</label>
@@ -71,6 +72,7 @@
                             <label class="btn btn-outline-secondary btn-sm" for="nas-gdp-radio">GDP</label>
                         </div>
                     </div>
+
 
                     <!-- Data Stats -->
                     <div class="control-card mb-2 flex-grow-1">
@@ -116,9 +118,19 @@
 
                 <!-- Center: Chart -->
                 <div class="col-md-6 d-flex flex-column">
+                    <!-- Chart tabs -->
+                    <ul class="nav nav-tabs nav-tabs-sm" id="chart-tabs">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-tab="lorenz" href="#">Lorenz</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-tab="cdf" href="#">CDF</a>
+                        </li>
+                    </ul>
                     <div class="chart-card flex-grow-1">
                         <div class="chart-container-full position-relative h-100">
                             <div id="lorenz-chart"></div>
+                            <div id="cdf-chart" style="display:none;"></div>
                             <div class="loading-overlay" id="loading-overlay" style="display: none;">
                                 <div class="spinner"></div>
                             </div>
@@ -128,7 +140,7 @@
                         </div>
                     </div>
                     <!-- Legend -->
-                    <div class="legend-bar mt-2">
+                    <div class="legend-bar mt-2" id="chart-legend">
                         <span><span class="legend-line-sm survey"></span> Survey</span>
                         <span><span class="legend-line-sm adjusted"></span> Adjusted</span>
                         <span><span class="legend-dot-sm"></span> Pareto</span>
@@ -213,6 +225,6 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
 
     <!-- Application Scripts -->
-    <script type="module" src="js/app.js"></script>
+    <script type="module" src="js/app.js?v=5"></script>
 </body>
 </html>

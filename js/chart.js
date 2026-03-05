@@ -463,6 +463,93 @@ export class LorenzChart {
 }
 
 /**
+ * CDFChart - Cumulative distribution function chart
+ * Plots welfare ($/day) on x-axis vs cumulative population share on y-axis
+ */
+export class CDFChart {
+    constructor(containerId) {
+        this.containerId = containerId;
+        this.container = document.getElementById(containerId);
+        this.svg = null;
+        this.margin = { top: 20, right: 25, bottom: 50, left: 55 };
+        this.colors = { survey: '#2563eb', adjusted: '#dc2626' };
+    }
+
+    init() {
+        this.container.innerHTML = '';
+        const rect = this.container.getBoundingClientRect();
+        this.width = rect.width || 500;
+        this.height = rect.height || 400;
+        this.innerWidth = this.width - this.margin.left - this.margin.right;
+        this.innerHeight = this.height - this.margin.top - this.margin.bottom;
+
+        this.svg = d3.select(this.container).append('svg')
+            .attr('width', this.width).attr('height', this.height);
+        this.g = this.svg.append('g')
+            .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
+    }
+
+    update(data) {
+        this.init();
+        if (!data.surveyLorenz) return;
+
+        // Build CDF: welfare on x, cumulative pop on y
+        const surveyCDF = data.distribution
+            .filter(d => d.w != null && d.p != null)
+            .map(d => ({ x: d.w, y: d.p }));
+
+        const maxW = d3.max(surveyCDF, d => d.x) || 50;
+        const p95idx = Math.floor(surveyCDF.length * 0.95);
+        const xMax = Math.min(maxW, surveyCDF[p95idx]?.x * 1.2 || maxW);
+
+        const xScale = d3.scaleLinear().domain([0, xMax]).range([0, this.innerWidth]);
+        const yScale = d3.scaleLinear().domain([0, 1]).range([this.innerHeight, 0]);
+
+        // Grid
+        this.g.append('g').attr('transform', `translate(0,${this.innerHeight})`)
+            .call(d3.axisBottom(xScale).ticks(6).tickSize(-this.innerHeight).tickFormat(''))
+            .selectAll('line').attr('stroke', '#e5e7eb').attr('stroke-dasharray', '3,3');
+        this.g.selectAll('.domain').remove();
+
+        // Axes
+        this.g.append('g').attr('transform', `translate(0,${this.innerHeight})`)
+            .call(d3.axisBottom(xScale).ticks(6).tickFormat(d => `$${d}`));
+        this.g.append('g')
+            .call(d3.axisLeft(yScale).tickFormat(d => `${(d * 100).toFixed(0)}%`).ticks(5));
+
+        // Axis labels
+        this.g.append('text').attr('x', this.innerWidth / 2).attr('y', this.innerHeight + 40)
+            .attr('text-anchor', 'middle').attr('fill', '#374151').attr('font-size', '12px')
+            .text('Welfare ($/day PPP)');
+        this.g.append('text').attr('transform', 'rotate(-90)')
+            .attr('x', -this.innerHeight / 2).attr('y', -40)
+            .attr('text-anchor', 'middle').attr('fill', '#374151').attr('font-size', '12px')
+            .text('Cumulative population share');
+
+        // Survey CDF line
+        const line = d3.line().x(d => xScale(d.x)).y(d => yScale(d.y)).curve(d3.curveMonotoneX);
+        this.g.append('path').datum(surveyCDF.filter(d => d.x <= xMax))
+            .attr('fill', 'none').attr('stroke', this.colors.survey).attr('stroke-width', 2.5)
+            .attr('d', line);
+
+        // Adjusted CDF (if available)
+        if (data.adjustedDist) {
+            const adjCDF = data.adjustedDist
+                .filter(d => d.w != null && d.p != null)
+                .map(d => ({ x: d.w, y: d.p }));
+            if (adjCDF.length > 0) {
+                this.g.append('path').datum(adjCDF.filter(d => d.x <= xMax))
+                    .attr('fill', 'none').attr('stroke', this.colors.adjusted).attr('stroke-width', 2.5)
+                    .attr('d', line);
+            }
+        }
+    }
+
+    clear() { this.container.innerHTML = ''; }
+    resize() { /* re-render on next update */ }
+}
+
+/**
  * Create a simple legend component
  */
 export function createLegend(containerId, items) {

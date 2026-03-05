@@ -1,18 +1,20 @@
 /**
  * data-loader.js - Data loading and caching for Chandy-Seidel visualization
  *
- * Handles lazy loading of country distribution data and NAS aggregates.
+ * Loads compact columnar JSON files and converts to row format for calculations.
+ * Supports two access patterns:
+ *   - Per-country:  data/dist/{CODE}.json  (all years for one country)
+ *   - Per-year:     data/dist-by-year/{YEAR}.json (all countries for one year)
  */
 
 // Cache for loaded data
 const countryDataCache = new Map();
+const yearDataCache = new Map();
 let countriesMetadata = null;
 let nasData = null;
 
 /**
  * Load country metadata (list of countries with available years)
- *
- * @returns {Promise<Array>} Array of country objects
  */
 export async function loadCountries() {
     if (countriesMetadata) {
@@ -34,8 +36,6 @@ export async function loadCountries() {
 
 /**
  * Load NAS (National Accounts) data for all countries
- *
- * @returns {Promise<Object>} Object keyed by country code
  */
 export async function loadNasData() {
     if (nasData) {
@@ -56,32 +56,55 @@ export async function loadNasData() {
 }
 
 /**
- * Load distribution data for a specific country
- * Data is cached after first load.
+ * Convert compact columnar data to row-based bins array.
  *
- * @param {string} countryCode - ISO3 country code
- * @returns {Promise<Object>} Country distribution data
+ * Columnar format:  {"p":[...], "l":[...], "w":[...], "n":[...]}
+ * Row format:       [{q, p, l, w, new}, ...]
+ */
+function columnarToRows(cols) {
+    const len = cols.p.length;
+    const bins = new Array(len);
+    const hasNew = cols.n !== undefined;
+
+    for (let i = 0; i < len; i++) {
+        bins[i] = {
+            q: i + 1,
+            p: cols.p[i],
+            l: cols.l[i],
+            w: cols.w[i],
+            new: hasNew ? cols.n[i] : 0
+        };
+    }
+    return bins;
+}
+
+/**
+ * Load distribution data for a specific country (all years).
+ * Data is cached after first load.
  */
 export async function loadCountryData(countryCode) {
     if (!countryCode) {
         throw new Error('Country code is required');
     }
 
-    // Check cache
     if (countryDataCache.has(countryCode)) {
         return countryDataCache.get(countryCode);
     }
 
     try {
-        const response = await fetch(`data/distributions/${countryCode}.json`);
+        const response = await fetch(`data/dist/${countryCode}.json`);
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        const data = await response.json();
+        const compact = await response.json();
 
-        // Cache the data
+        // Convert columnar format to legacy structure: {code, years: {YEAR: {bins: [...]}}}
+        const data = { code: countryCode, years: {} };
+        for (const [year, cols] of Object.entries(compact)) {
+            data.years[year] = { bins: columnarToRows(cols) };
+        }
+
         countryDataCache.set(countryCode, data);
-
         return data;
     } catch (error) {
         console.error(`Failed to load data for ${countryCode}:`, error);
@@ -91,10 +114,6 @@ export async function loadCountryData(countryCode) {
 
 /**
  * Get distribution for a specific country and year
- *
- * @param {string} countryCode - ISO3 country code
- * @param {number} year - Year
- * @returns {Promise<Object>} Distribution data with bins array
  */
 export async function getDistribution(countryCode, year) {
     const countryData = await loadCountryData(countryCode);
@@ -105,29 +124,77 @@ export async function getDistribution(countryCode, year) {
 
     const yearData = countryData.years[year];
 
-    // Convert bins to standard format {p, l, w}
-    const distribution = yearData.bins.map(bin => ({
-        p: bin.p,
-        l: bin.l,
-        w: bin.w,
-        quantile: bin.q,
-        isNew: bin.new === 1
-    }));
+    // Filter out placeholder bins (new=1 with null p/l values)
+    const distribution = yearData.bins
+        .filter(bin => bin.p != null && bin.l != null)
+        .map(bin => ({
+            p: bin.p,
+            l: bin.l,
+            w: bin.w,
+            quantile: bin.q,
+            isNew: bin.new === 1
+        }));
+
+    // Get survey_mean from NAS data (distribution files don't include it)
+    const nas = await loadNasData();
+    const nasEntry = nas?.[countryCode]?.[year];
+    const surveyMean = nasEntry?.survey_mean || calculateMeanFromBins(distribution);
 
     return {
         countryCode,
         year,
         distribution,
-        surveyMean: yearData.survey_mean || calculateMeanFromBins(distribution)
+        surveyMean
     };
 }
 
 /**
- * Get NAS data for a specific country and year
+ * Load all countries for a specific year (for batch operations).
+ * Uses per-year files for a single HTTP request.
  *
- * @param {string} countryCode - ISO3 country code
- * @param {number} year - Year
- * @returns {Promise<Object>} NAS data with hfce and gdp
+ * @param {number|string} year - Year to load
+ * @returns {Promise<Object>} Object keyed by country code, each value is {bins: [...]}
+ */
+export async function loadAllCountriesForYear(year) {
+    const yearStr = String(year);
+
+    if (yearDataCache.has(yearStr)) {
+        return yearDataCache.get(yearStr);
+    }
+
+    try {
+        const response = await fetch(`data/dist-by-year/${yearStr}.json`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const compact = await response.json();
+
+        // Convert each country's columnar data to rows
+        const result = {};
+        for (const [cc, cols] of Object.entries(compact)) {
+            const bins = columnarToRows(cols);
+            result[cc] = {
+                distribution: bins.map(bin => ({
+                    p: bin.p,
+                    l: bin.l,
+                    w: bin.w,
+                    quantile: bin.q,
+                    isNew: bin.new === 1
+                })),
+                surveyMean: calculateMeanFromBins(bins.map(b => ({p: b.p, w: b.w})))
+            };
+        }
+
+        yearDataCache.set(yearStr, result);
+        return result;
+    } catch (error) {
+        console.error(`Failed to load year ${year}:`, error);
+        throw new Error(`Could not load distribution data for year ${year}.`);
+    }
+}
+
+/**
+ * Get NAS data for a specific country and year
  */
 export async function getNasForCountryYear(countryCode, year) {
     const nas = await loadNasData();
@@ -141,9 +208,6 @@ export async function getNasForCountryYear(countryCode, year) {
 
 /**
  * Get all available years for a country
- *
- * @param {string} countryCode - ISO3 country code
- * @returns {Promise<Array<number>>} Array of years
  */
 export async function getAvailableYears(countryCode) {
     const countries = await loadCountries();
@@ -158,9 +222,6 @@ export async function getAvailableYears(countryCode) {
 
 /**
  * Search countries by name or code
- *
- * @param {string} query - Search query
- * @returns {Promise<Array>} Matching countries
  */
 export async function searchCountries(query) {
     const countries = await loadCountries();
@@ -174,8 +235,6 @@ export async function searchCountries(query) {
 
 /**
  * Get countries grouped by region
- *
- * @returns {Promise<Object>} Countries grouped by region code
  */
 export async function getCountriesByRegion() {
     const countries = await loadCountries();
@@ -204,7 +263,6 @@ export async function getCountriesByRegion() {
         grouped[region].countries.push(country);
     });
 
-    // Sort countries within each region
     Object.values(grouped).forEach(region => {
         region.countries.sort((a, b) => a.name.localeCompare(b.name));
     });
@@ -237,14 +295,13 @@ function calculateMeanFromBins(distribution) {
  */
 export function clearCache() {
     countryDataCache.clear();
+    yearDataCache.clear();
     countriesMetadata = null;
     nasData = null;
 }
 
 /**
  * Preload data for a list of countries (for faster access)
- *
- * @param {Array<string>} countryCodes - List of country codes to preload
  */
 export async function preloadCountries(countryCodes) {
     const promises = countryCodes.map(code =>
@@ -259,13 +316,12 @@ export async function preloadCountries(countryCodes) {
 
 /**
  * Get data loading status
- *
- * @returns {Object} Status of loaded data
  */
 export function getLoadStatus() {
     return {
         countriesLoaded: countriesMetadata !== null,
         nasLoaded: nasData !== null,
-        cachedCountries: Array.from(countryDataCache.keys())
+        cachedCountries: Array.from(countryDataCache.keys()),
+        cachedYears: Array.from(yearDataCache.keys())
     };
 }

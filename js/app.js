@@ -6,7 +6,7 @@
 
 import { calculateChandySeidel } from './chandy-seidel.js';
 import { calculateGini, calculateStatistics, formatGini, formatPercent } from './lorenz.js';
-import { LorenzChart, createLegend } from './chart.js';
+import { LorenzChart, CDFChart, createLegend } from './chart.js';
 import {
     loadCountries,
     loadNasData,
@@ -27,6 +27,7 @@ const state = {
     selectedYear: 2019,
     gapShare: 0.5,
     nasSource: 'hfce',
+    activeTab: 'lorenz',
 
     // Data
     countries: [],
@@ -46,12 +47,15 @@ const state = {
     }
 };
 
-// Chart instance
+// Chart instances
 let chart = null;
+let cdfChart = null;
 
 // DOM Elements
 const elements = {
-    countrySelect: document.getElementById('country-select'),
+    countrySelect: document.getElementById('country-select'),  // hidden input storing code
+    countryInput: document.getElementById('country-input'),
+    countryDropdown: document.getElementById('country-dropdown'),
     yearButtons: document.getElementById('year-buttons'),
     loadBtn: document.getElementById('load-btn'),
     gapShareSlider: document.getElementById('gap-share-slider'),
@@ -86,6 +90,9 @@ const elements = {
     statusMessage: document.getElementById('status-message'),
     statusText: document.getElementById('status-text'),
 
+    // Chart tabs
+    chartTabs: document.getElementById('chart-tabs'),
+
     // Export buttons
     exportDistBtn: document.getElementById('export-dist-btn'),
     exportSummaryBtn: document.getElementById('export-summary-btn'),
@@ -98,8 +105,9 @@ const elements = {
 async function init() {
     console.log('Initializing Chandy-Seidel Visualization...');
 
-    // Initialize chart
+    // Initialize charts
     chart = new LorenzChart('lorenz-chart');
+    cdfChart = new CDFChart('cdf-chart');
 
     // Set up event listeners
     setupEventListeners();
@@ -149,73 +157,37 @@ async function loadInitialData() {
  * Auto-select first country and load its distribution
  */
 async function autoSelectFirstCountry() {
-    // Find first country option (skip the "Select a country..." placeholder)
-    const options = elements.countrySelect.querySelectorAll('option[value]:not([value=""])');
-    if (options.length === 0) return;
+    if (state.countries.length === 0) return;
 
-    const firstOption = options[0];
-    const countryCode = firstOption.value;
-    const years = JSON.parse(firstOption.dataset.years || '[]');
+    const country = state.countries[0];
+    if (!country.code || !country.years || country.years.length === 0) return;
 
-    if (!countryCode || years.length === 0) return;
-
-    // Set the selection
-    elements.countrySelect.value = countryCode;
-    state.selectedCountry = countryCode;
-
-    // Populate year buttons and select most recent year
-    populateYearButtons(years);
+    selectCountry(country);
 
     // Load the distribution automatically
     await loadDistribution();
 }
 
 /**
- * Populate country dropdown with optgroups by region
+ * Store flat country list for search
  */
-async function populateCountryDropdown(countries) {
-    elements.countrySelect.innerHTML = '';
-
-    // Add default option
-    const defaultOption = document.createElement('option');
-    defaultOption.value = '';
-    defaultOption.textContent = 'Select a country...';
-    elements.countrySelect.appendChild(defaultOption);
-
-    // Group by region
-    const byRegion = await getCountriesByRegion();
-
-    // Sort regions
-    const regionOrder = ['NAC', 'ECA', 'EAP', 'LAC', 'SAS', 'MNA', 'SSA', 'OHI'];
-    const sortedRegions = Object.entries(byRegion).sort((a, b) => {
-        const idxA = regionOrder.indexOf(a[0]);
-        const idxB = regionOrder.indexOf(b[0]);
-        return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
-    });
-
-    // Add optgroups
-    sortedRegions.forEach(([regionCode, region]) => {
-        const optgroup = document.createElement('optgroup');
-        optgroup.label = region.name;
-
-        region.countries.forEach(country => {
-            const option = document.createElement('option');
-            option.value = country.code;
-            option.textContent = `${country.name} (${country.code})`;
-            option.dataset.years = JSON.stringify(country.years);
-            optgroup.appendChild(option);
-        });
-
-        elements.countrySelect.appendChild(optgroup);
-    });
+function populateCountryDropdown(countries) {
+    // countries list is stored in state.countries already
 }
 
 /**
  * Set up event listeners
  */
 function setupEventListeners() {
-    // Country selection
-    elements.countrySelect.addEventListener('change', onCountryChange);
+    // Country search input
+    elements.countryInput.addEventListener('input', onCountrySearch);
+    elements.countryInput.addEventListener('focus', () => showCountryDropdown());
+    elements.countryInput.addEventListener('keydown', onCountryKeydown);
+    document.addEventListener('click', (e) => {
+        if (!elements.countryInput.contains(e.target) && !elements.countryDropdown.contains(e.target)) {
+            elements.countryDropdown.style.display = 'none';
+        }
+    });
 
     // Load button
     elements.loadBtn.addEventListener('click', loadDistribution);
@@ -226,6 +198,20 @@ function setupEventListeners() {
     // NAS source radio
     elements.nasHfceRadio.addEventListener('change', onNasSourceChange);
     elements.nasGdpRadio.addEventListener('change', onNasSourceChange);
+
+    // Chart tabs
+    elements.chartTabs.addEventListener('click', (e) => {
+        const link = e.target.closest('[data-tab]');
+        if (!link) return;
+        e.preventDefault();
+        elements.chartTabs.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+        state.activeTab = link.dataset.tab;
+        // Show/hide chart containers
+        document.getElementById('lorenz-chart').style.display = state.activeTab === 'lorenz' ? '' : 'none';
+        document.getElementById('cdf-chart').style.display = state.activeTab === 'cdf' ? '' : 'none';
+        updateChart();
+    });
 
     // Export buttons
     elements.exportDistBtn.addEventListener('click', () => {
@@ -253,35 +239,97 @@ function setupEventListeners() {
 
     // Window resize
     window.addEventListener('resize', debounce(() => {
-        if (chart) {
-            chart.resize();
-            if (state.chartData.surveyLorenz) {
-                chart.update(state.chartData);
-            }
-        }
+        if (chart) chart.resize();
+        updateChart();
     }, 250));
 }
 
 /**
- * Handle country selection change
+ * Show filtered country dropdown
  */
-function onCountryChange(event) {
-    const countryCode = event.target.value;
-    state.selectedCountry = countryCode || null;
+function showCountryDropdown(filter = '') {
+    const dd = elements.countryDropdown;
+    dd.innerHTML = '';
 
-    if (!countryCode) {
-        elements.loadBtn.disabled = true;
-        elements.yearButtons.innerHTML = '';
+    const lowerFilter = filter.toLowerCase();
+    const matches = state.countries.filter(c =>
+        !lowerFilter ||
+        c.name.toLowerCase().includes(lowerFilter) ||
+        c.code.toLowerCase().includes(lowerFilter)
+    );
+
+    if (matches.length === 0) {
+        dd.style.display = 'none';
         return;
     }
 
-    // Get available years for this country
-    const option = event.target.selectedOptions[0];
-    const years = JSON.parse(option.dataset.years || '[]');
+    // Limit to 30 results for performance
+    matches.slice(0, 30).forEach((country, idx) => {
+        const item = document.createElement('div');
+        item.className = 'dropdown-item';
+        if (idx === 0) item.classList.add('active');
+        item.innerHTML = `${country.name} <span class="code">${country.code}</span>`;
+        item.dataset.code = country.code;
+        item.dataset.years = JSON.stringify(country.years);
+        item.addEventListener('click', () => selectCountry(country));
+        dd.appendChild(item);
+    });
 
-    // Generate year radio buttons
-    populateYearButtons(years);
+    dd.style.display = 'block';
+}
 
+/**
+ * Handle typing in country search
+ */
+function onCountrySearch(event) {
+    showCountryDropdown(event.target.value);
+}
+
+/**
+ * Handle keyboard navigation in dropdown
+ */
+function onCountryKeydown(event) {
+    const dd = elements.countryDropdown;
+    if (dd.style.display === 'none') return;
+
+    const items = dd.querySelectorAll('.dropdown-item');
+    const active = dd.querySelector('.dropdown-item.active');
+    let idx = Array.from(items).indexOf(active);
+
+    if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        if (idx < items.length - 1) idx++;
+        items.forEach(i => i.classList.remove('active'));
+        items[idx].classList.add('active');
+        items[idx].scrollIntoView({ block: 'nearest' });
+    } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (idx > 0) idx--;
+        items.forEach(i => i.classList.remove('active'));
+        items[idx].classList.add('active');
+        items[idx].scrollIntoView({ block: 'nearest' });
+    } else if (event.key === 'Enter') {
+        event.preventDefault();
+        if (active) {
+            const code = active.dataset.code;
+            const country = state.countries.find(c => c.code === code);
+            if (country) selectCountry(country);
+        }
+    } else if (event.key === 'Escape') {
+        dd.style.display = 'none';
+    }
+}
+
+/**
+ * Select a country from dropdown
+ */
+function selectCountry(country) {
+    elements.countryInput.value = `${country.name} (${country.code})`;
+    elements.countrySelect.value = country.code;
+    elements.countryDropdown.style.display = 'none';
+
+    state.selectedCountry = country.code;
+    populateYearButtons(country.years || []);
     elements.loadBtn.disabled = false;
 }
 
@@ -606,11 +654,24 @@ function getTop10Share(lorenz) {
 }
 
 /**
- * Update chart
+ * Update chart based on active tab
  */
 function updateChart() {
-    if (chart && state.chartData.surveyLorenz) {
+    if (!state.chartData.surveyLorenz) return;
+
+    if (state.activeTab === 'lorenz' && chart) {
         chart.update(state.chartData);
+    } else if (state.activeTab === 'cdf' && cdfChart) {
+        const cdfData = {
+            surveyLorenz: state.chartData.surveyLorenz,
+            distribution: state.currentDistribution?.distribution || [],
+            adjustedDist: state.adjustmentResult?.adjusted
+                ? state.adjustmentResult.adjustedDist.map(d => ({
+                    p: d.p, l: d.l, w: d.w || d.welfare
+                }))
+                : null
+        };
+        cdfChart.update(cdfData);
     }
 }
 
