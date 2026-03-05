@@ -526,6 +526,14 @@ export class CDFChart {
             .attr('text-anchor', 'middle').attr('fill', '#374151').attr('font-size', '12px')
             .text('Cumulative population share');
 
+        // 45-degree equality line
+        const eqData = [{ x: 0, y: 0 }, { x: xMax, y: 1 }];
+        const eqLine = d3.line().x(d => xScale(d.x)).y(d => yScale(d.y));
+        this.g.append('path').datum(eqData)
+            .attr('fill', 'none').attr('stroke', '#9ca3af')
+            .attr('stroke-width', 1).attr('stroke-dasharray', '5,5')
+            .attr('d', eqLine);
+
         // Survey CDF line
         const line = d3.line().x(d => xScale(d.x)).y(d => yScale(d.y)).curve(d3.curveMonotoneX);
         this.g.append('path').datum(surveyCDF.filter(d => d.x <= xMax))
