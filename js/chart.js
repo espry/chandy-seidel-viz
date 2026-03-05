@@ -20,14 +20,14 @@ export class LorenzChart {
         this.options = {
             margin: { top: 20, right: 25, bottom: 50, left: 55 },
             colors: {
-                equality: '#9ca3af',
+                equality: '#6b7280',
                 survey: '#2563eb',
                 adjusted: '#dc2626',
                 paretoPoints: '#ef4444',
                 grid: '#e5e7eb'
             },
             lineWidth: {
-                equality: 1,
+                equality: 1.5,
                 survey: 2.5,
                 adjusted: 2.5
             },
