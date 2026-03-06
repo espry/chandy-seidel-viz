@@ -60,6 +60,11 @@ Key formulas:
 
 Dependencies: D3.js v7, Bootstrap 5.3 (both CDN, no build step).
 
-## Reference
+## Data Source
+
+Distribution data comes from the **1000 Binned Global Distribution** dataset, which provides 1000 welfare quantile bins per country-survey-year. Available from the [World Bank Data Catalog](https://datacatalog.worldbank.org/search/dataset/0064304/1000-binned-global-distribution) (CC BY 3.0 IGO).
+
+Mahler, D. G., Yonzan, N., & Lakner, C. (2022). *The impact of COVID-19 on global inequality and poverty.* Policy Research Working Paper 10198, World Bank. Updated with PIP (September 2025).
+## References
 
 Chandy, L., & Seidel, B. (2017). *How much do we really know about inequality within countries around the world?* Brookings Institution.
